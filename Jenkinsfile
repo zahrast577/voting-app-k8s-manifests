@@ -3,8 +3,6 @@ pipeline {
     environment {
         DOCKERHUB_USER = 'zahrast577'
         GITHUB_USER    = 'zahrast577'
-        DOCKER_HOST = 'unix:///var/run/docker.sock'
-        PATH = "/usr/bin:/usr/local/bin:/bin:/usr/sbin:/sbin:${env.PATH}"
     }
     stages {
         stage('Checkout') {
@@ -16,12 +14,9 @@ pipeline {
         stage('Build Images') {
             steps {
                 echo 'Build des images Docker...'
-                sh """
-                    export PATH=/usr/bin:/usr/local/bin:\$PATH
-                    /usr/bin/docker build -t ${DOCKERHUB_USER}/vote:${BUILD_NUMBER} ./vote
-                    /usr/bin/docker build -t ${DOCKERHUB_USER}/result:${BUILD_NUMBER} ./result
-                    /usr/bin/docker build -t ${DOCKERHUB_USER}/worker:${BUILD_NUMBER} ./worker
-                """
+                sh "docker build -t ${DOCKERHUB_USER}/vote:${BUILD_NUMBER} ./vote"
+                sh "docker build -t ${DOCKERHUB_USER}/result:${BUILD_NUMBER} ./result"
+                sh "docker build -t ${DOCKERHUB_USER}/worker:${BUILD_NUMBER} ./worker"
             }
         }
         stage('Push to DockerHub') {
@@ -31,19 +26,16 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh """
-                        export PATH=/usr/bin:/usr/local/bin:\$PATH
-                        echo \$DOCKER_PASS | /usr/bin/docker login -u \$DOCKER_USER --password-stdin
-                        /usr/bin/docker push ${DOCKERHUB_USER}/vote:${BUILD_NUMBER}
-                        /usr/bin/docker push ${DOCKERHUB_USER}/result:${BUILD_NUMBER}
-                        /usr/bin/docker push ${DOCKERHUB_USER}/worker:${BUILD_NUMBER}
-                        /usr/bin/docker tag ${DOCKERHUB_USER}/vote:${BUILD_NUMBER} ${DOCKERHUB_USER}/vote:latest
-                        /usr/bin/docker tag ${DOCKERHUB_USER}/result:${BUILD_NUMBER} ${DOCKERHUB_USER}/result:latest
-                        /usr/bin/docker tag ${DOCKERHUB_USER}/worker:${BUILD_NUMBER} ${DOCKERHUB_USER}/worker:latest
-                        /usr/bin/docker push ${DOCKERHUB_USER}/vote:latest
-                        /usr/bin/docker push ${DOCKERHUB_USER}/result:latest
-                        /usr/bin/docker push ${DOCKERHUB_USER}/worker:latest
-                    """
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh "docker push ${DOCKERHUB_USER}/vote:${BUILD_NUMBER}"
+                    sh "docker push ${DOCKERHUB_USER}/result:${BUILD_NUMBER}"
+                    sh "docker push ${DOCKERHUB_USER}/worker:${BUILD_NUMBER}"
+                    sh "docker tag ${DOCKERHUB_USER}/vote:${BUILD_NUMBER} ${DOCKERHUB_USER}/vote:latest"
+                    sh "docker tag ${DOCKERHUB_USER}/result:${BUILD_NUMBER} ${DOCKERHUB_USER}/result:latest"
+                    sh "docker tag ${DOCKERHUB_USER}/worker:${BUILD_NUMBER} ${DOCKERHUB_USER}/worker:latest"
+                    sh "docker push ${DOCKERHUB_USER}/vote:latest"
+                    sh "docker push ${DOCKERHUB_USER}/result:latest"
+                    sh "docker push ${DOCKERHUB_USER}/worker:latest"
                 }
             }
         }
@@ -54,17 +46,14 @@ pipeline {
                     usernameVariable: 'GIT_USER',
                     passwordVariable: 'GIT_PASS'
                 )]) {
-                    sh """
-                        export PATH=/usr/bin:/usr/local/bin:\$PATH
-                        git config --global user.email "jenkins@ci.com"
-                        git config --global user.name "Jenkins CI"
-                        sed -i 's|image: ${DOCKERHUB_USER}/vote:.*|image: ${DOCKERHUB_USER}/vote:${BUILD_NUMBER}|g' vote/deployment.yaml
-                        sed -i 's|image: ${DOCKERHUB_USER}/result:.*|image: ${DOCKERHUB_USER}/result:${BUILD_NUMBER}|g' result/deployment.yaml
-                        sed -i 's|image: ${DOCKERHUB_USER}/worker:.*|image: ${DOCKERHUB_USER}/worker:${BUILD_NUMBER}|g' worker/deployment.yaml
-                        git add .
-                        git commit -m "CI: update images to build ${BUILD_NUMBER} [skip ci]"
-                        git push https://\${GIT_USER}:\${GIT_PASS}@github.com/${GITHUB_USER}/voting-app-k8s-manifests.git main
-                    """
+                    sh 'git config --global user.email "jenkins@ci.com"'
+                    sh 'git config --global user.name "Jenkins CI"'
+                    sh "sed -i 's|image: ${DOCKERHUB_USER}/vote:.*|image: ${DOCKERHUB_USER}/vote:${BUILD_NUMBER}|g' vote/deployment.yaml"
+                    sh "sed -i 's|image: ${DOCKERHUB_USER}/result:.*|image: ${DOCKERHUB_USER}/result:${BUILD_NUMBER}|g' result/deployment.yaml"
+                    sh "sed -i 's|image: ${DOCKERHUB_USER}/worker:.*|image: ${DOCKERHUB_USER}/worker:${BUILD_NUMBER}|g' worker/deployment.yaml"
+                    sh 'git add .'
+                    sh "git commit -m 'CI: update images to build ${BUILD_NUMBER} [skip ci]'"
+                    sh "git push https://\${GIT_USER}:\${GIT_PASS}@github.com/${GITHUB_USER}/voting-app-k8s-manifests.git main"
                 }
             }
         }
@@ -72,11 +61,6 @@ pipeline {
     post {
         success { echo 'Pipeline reussi !' }
         failure { echo 'Pipeline echoue.' }
-        always {
-            sh """
-                export PATH=/usr/bin:/usr/local/bin:\$PATH
-                /usr/bin/docker logout || true
-            """
-        }
+        always  { sh 'docker logout || true' }
     }
 }
